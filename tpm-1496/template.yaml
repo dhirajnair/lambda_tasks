@@ -1,50 +1,62 @@
-Description: TODO
+Description: Lambda task for TPM-1496
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-
-Parameters:
-  Stage:
-    Type: String
-    Default: dev
-    Description: Name of the stage
 
 Globals:
   Function:
     Runtime: nodejs14.x
     Tracing: Active
+    Tags:
+      owner: dhirajnair
+      purpose: TPM-1496
+
 
 Resources:
-  BoilerplateFunction:
+  FlaggedWordsScannerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./build/handlers/http/
-      Handler: example.get
-      Events:
-        PostVoteEvent:
-          Type: Api
-          Properties:
-            Path: /example
-            Method: get
+      FunctionName: FlaggedWordsScannerFunction
+      CodeUri: ./build/handlers/sqs/
+      Handler: index.handler
+      Policies:
+      - SQSPollerPolicy:
+          QueueName:
+            !GetAtt TPM1496SqsQueue.QueueName
+      - SNSPublishMessagePolicy:
+          TopicName:
+            !GetAtt TPM1496SnsTopic.TopicName
+      - CloudWatchPutMetricPolicy: {}
+      Tags:
+        owner: dhirajnair
+        purpose: 'TPM-1496'
 
-  # Boilerplate for IAM role to enable logging
-  CloudWatchRole:
-    Type: AWS::IAM::Role
+  TPM1496SqsQueue:
+    Type: AWS::SQS::Queue
     Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - apigateway.amazonaws.com
-            Action: sts:AssumeRole
-      Path: /
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+      QueueName: TPM1496SqsQueue
+      DelaySeconds: 0
+      VisibilityTimeout: 120
+      Tags:
+        - Value: "dhirajnair"
+          Key: "owner"
+        - Value: "TPM-1496"
+          Key: "purpose"
 
-  Account:
-    Type: AWS::ApiGateway::Account
+  TPM1496SnsTopic:
+    Type: AWS::SNS::Topic
     Properties:
-      CloudWatchRoleArn: !GetAtt CloudWatchRole.Arn
+      TopicName: TPM1496SnsTopic
+      Tags:
+        - Value: "dhirajnair"
+          Key: "owner"
+        - Value: "TPM-1496"
+          Key: "purpose"
 
-#Outputs: # You should specify the Stack's external interfaces as Outputs
+
+  FlaggedWordsScannerFunctionEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt TPM1496SqsQueue.Arn
+      FunctionName: !GetAtt FlaggedWordsScannerFunction.Arn
