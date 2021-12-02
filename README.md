@@ -1,6 +1,6 @@
 # Lambda Typescript & CloudFormation Boilerplate
 
-Boilerplate template created for use in [TPM Lambda Badge assignment](https://docs.google.com/document/d/1yOggsR0g-m_kOCa6-WAl6UTaW36hPa6RnxIYZcTlCgk/edit#) tasks.
+Boilerplate template created for use in Lambda tasks.
 
 Use a copy of the `task-name` directory per assignment.
 
