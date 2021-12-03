@@ -2,6 +2,12 @@ Description: Lambda task for TPM-1496
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
+Parameters:
+  FlaggedWordsList:
+    Type: String
+    Default: oracle,ibm,vmware
+    Description:  List of word to be flagged.Comma Separated.
+
 Globals:
   Function:
     Runtime: nodejs14.x
@@ -12,10 +18,10 @@ Globals:
 
 
 Resources:
-  FlaggedWordsScannerFunction:
+  TPM1496Function:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: FlaggedWordsScannerFunction
+      FunctionName: TPM1496Function
       CodeUri: ./build/handlers/sqs/
       Handler: index.handler
       Policies:
@@ -26,6 +32,10 @@ Resources:
           TopicName:
             !GetAtt TPM1496SnsTopic.TopicName
       - CloudWatchPutMetricPolicy: {}
+      Environment:
+        Variables: 
+          TOPIC_ARN: !Ref TPM1496SnsTopic
+          FLAGGED_WORD_LIST: !Ref FlaggedWordsList
       Tags:
         owner: dhirajnair
         purpose: 'TPM-1496'
@@ -53,10 +63,10 @@ Resources:
           Key: "purpose"
 
 
-  FlaggedWordsScannerFunctionEventSourceMapping:
+  TPM1496FunctionEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       BatchSize: 10
       Enabled: true
       EventSourceArn: !GetAtt TPM1496SqsQueue.Arn
-      FunctionName: !GetAtt FlaggedWordsScannerFunction.Arn
+      FunctionName: !GetAtt TPM1496Function.Arn
