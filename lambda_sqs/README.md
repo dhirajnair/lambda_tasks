@@ -1,4 +1,4 @@
-# TPM-1496 Queue Processor Task
+# Queue Processor Task
 
 ## Pre-requisites
 

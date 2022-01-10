@@ -1,4 +1,4 @@
-# TPM-1769 HTTP API
+HTTP API
 
 ## Pre-requisites
 
