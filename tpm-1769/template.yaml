@@ -1,0 +1,134 @@
+Description: Lambda task for TPM-1769
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  ContestantList:
+    Type: String
+    Default: f1#n1,f2#n2,f3#n3,f4#n4,f5#n5
+    Description:  List of contestants firstname#lastname format.Comma Separated.
+  VotingTimeWindow:
+    Type: String
+    Default: 2022-01-010T01:00:00Z,2022-01-16T01:00:00Z
+    Description:  24 Hr voting window in UTC -> start,end.Comma Separated.
+  TPM1769Votingtable:
+    Type: String
+    Default: TPM1769Votingtable
+    Description:  Voting table name.
+  TPM1769Resultable:
+    Type: String
+    Default: TPM1769Resultable
+    Description:  Voting result table name.
+  TPM1769VotingtableStream:
+    Type: String
+    Default: "2022-01-07T09:30:36.658"
+    Description:  Voting table stream name.
+  TPM1769AccessKey:
+    Type: String
+    Default: "tempaccesskey1769"
+    Description:  Access Key.
+    
+
+Globals:
+  Function:
+    Runtime: nodejs14.x
+    Tracing: Active
+    Tags:
+      owner: dhirajnair
+      purpose: TPM-1769
+
+
+Resources:
+  TPM1769Vote:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TPM1769Vote
+      CodeUri: ./build/handlers/lambda/vote/
+      Handler: index.handler
+      AutoPublishAlias: window
+      MemorySize: 256
+      Policies:
+      - DynamoDBCrudPolicy:
+            TableName: !Ref TPM1769Votingtable
+      - CloudWatchPutMetricPolicy: {}
+      Environment:
+        Variables: 
+          CONTESTANT_LIST: !Ref ContestantList
+          VOTING_TIME_WINDOW: !Ref VotingTimeWindow
+          VOTING_TABLE: !Ref TPM1769Votingtable
+      Tags:
+        owner: dhirajnair
+        purpose: 'TPM-1769'
+
+  TPM1769VoteConcurrency:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget    
+    Properties:
+      MaxCapacity: 20
+      MinCapacity: 0
+      ResourceId: !Sub function:${TPM1769Vote}:window       
+      RoleARN: !Sub arn:aws:iam::${AWS::AccountId}:role/aws-service-role/lambda.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_LambdaConcurrency
+      ScalableDimension: lambda:function:ProvisionedConcurrency
+      ServiceNamespace: lambda
+      ScheduledActions:                                   
+        - ScalableTargetAction:
+            MinCapacity: 20
+          Schedule: 'cron(0 7 ? * MON-FRI *)'
+          ScheduledActionName: scale-out
+        - ScalableTargetAction:
+            MinCapacity: 0
+            MaxCapacity: 0
+          Schedule: 'cron(0 7 ? * FRI *)'
+          ScheduledActionName: scale-in 
+    DependsOn: TPM1769VoteAliaswindow                      
+
+  TPM1769Aggregate:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TPM1769Aggregate
+      CodeUri: ./build/handlers/lambda/aggregate/
+      Handler: index.handler
+      Policies:
+      - DynamoDBCrudPolicy:
+            TableName: !Ref TPM1769Resultable
+      - DynamoDBStreamReadPolicy:
+            TableName: !Ref TPM1769Votingtable
+            StreamName: !Ref TPM1769VotingtableStream
+      - CloudWatchPutMetricPolicy: {}
+      Environment:
+        Variables:
+          VOTING_RESULT_TABLE: !Ref TPM1769Resultable
+      Tags:
+        owner: dhirajnair
+        purpose: 'TPM-1769'
+
+  TPM1769Result:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TPM1769Result
+      CodeUri: ./build/handlers/lambda/result/
+      Handler: index.handler
+      Policies:
+      - DynamoDBReadPolicy:
+            TableName: !Ref TPM1769Resultable
+      - CloudWatchPutMetricPolicy: {}
+      Environment:
+        Variables:
+          VOTING_RESULT_TABLE: !Ref TPM1769Resultable
+      Tags:
+        owner: dhirajnair
+        purpose: 'TPM-1769'
+
+  TPM1769Authorizer:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TPM1769Authorizer
+      CodeUri: ./build/handlers/lambda/authorizer/
+      Handler: index.handler
+      Policies:
+      - CloudWatchPutMetricPolicy: {}
+      Environment:
+        Variables:
+          ACCESS_KEY: !Ref TPM1769AccessKey
+      Tags:
+        owner: dhirajnair
+        purpose: 'TPM-1769'
